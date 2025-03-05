@@ -2,115 +2,163 @@
 <html>
 <head>
     <title>Chat avec Bot</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .chat-container {
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            height: 400px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-            background-color: #f9f9f9;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 5px;
-        }
-        .user-message {
-            background-color: #e3f2fd;
-            text-align: right;
-            margin-left: 20%;
-        }
-        .bot-message {
-            background-color: #f1f1f1;
-            text-align: left;
-            margin-right: 20%;
-        }
-        .message-form {
-            display: flex;
-        }
-        .message-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px 0 0 5px;
-        }
-        .send-button {
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 0 5px 5px 0;
-            cursor: pointer;
-        }
-        .reply-btn {
-            background-color: #f0f0f0;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            padding: 2px 5px;
-            cursor: pointer;
-        }
-        .reply-btn:hover {
-            background-color: #e0e0e0;
-        }
-        .replying-to {
-            background-color: #fff3cd;
-            padding: 5px;
-            margin-bottom: 10px;
-            border-radius: 3px;
-            font-size: 0.9em;
-            display: none;
-        }
-    </style>
-    <script>
-        function replyToMessage(messageId) {
-            document.getElementById('parent_id').value = messageId;
-            var replyingTo = document.getElementById('replying-to');
-            replyingTo.style.display = 'block';
-            replyingTo.textContent = 'Réponse au message #' + messageId;
-            document.getElementById('message-input').focus();
-        }
-        
-        function cancelReply() {
-            document.getElementById('parent_id').value = {{ current_message_id }};
-            document.getElementById('replying-to').style.display = 'none';
-        }
-    </script>
+    <link rel="preload" href="/static/style.css" as="style">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <h1>Chat avec Bot</h1>
     
-    <div class="chat-container">
-        {% for sender, text, msg_id in messages %}
-            {% if sender == "Vous" %}
-                <div class="message user-message" data-message-id="{{ msg_id }}">
-                    <strong>{{ sender }}:</strong> {{ text }}
-                </div>
-            {% else %}
-                <div class="message bot-message" data-message-id="{{ msg_id }}">
-                    <strong>{{ sender }}:</strong> {{ text }}
-                    <button class="reply-btn" onclick="replyToMessage({{ msg_id }})" style="font-size: 0.8em; margin-left: 10px;">Répondre</button>
-                </div>
-            {% endif %}
-        {% endfor %}
+    <div id="chat-container" class="chat-container">
+        <!-- Les messages seront ajoutés ici par JavaScript -->
     </div>
 
     <div id="replying-to" class="replying-to">
-        Réponse au message #{{ current_message_id }}
+        Réponse au message #0
         <button onclick="cancelReply()" style="float: right; font-size: 0.8em;">Annuler</button>
     </div>
     
-    <form method="POST" class="message-form">
-        <input type="hidden" id="parent_id" name="parent_id" value="{{ current_message_id }}">
-        <input type="text" id="message-input" name="message" placeholder="Écrivez un message..." required class="message-input">
-        <button type="submit" class="send-button">Envoyer</button>
-    </form>
+    <div class="message-form">
+        <input type="hidden" id="parent_id" value="0">
+        <textarea id="message-input" placeholder="Demander au Chat..." required class="message-input"></textarea>
+        <button id="send-button" class="send-button">Envoyer</button>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentMessageId = 0;
+        
+        // Fonction pour charger les messages au chargement de la page
+        async function loadMessages() {
+            try {
+                const response = await fetch('/api/messages');
+                const data = await response.json();
+                
+                const chatContainer = document.getElementById('chat-container');
+                chatContainer.innerHTML = '';
+                
+                data.messages.forEach(message => {
+                    addMessageToDOM(message.sender, message.text, message.id);
+                });
+                
+                // Scroll to bottom
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                currentMessageId = data.current_message_id;
+            } catch (error) {
+                console.error('Erreur lors du chargement des messages:', error);
+            }
+        }
+        
+        // Fonction pour ajouter un message au DOM
+        function addMessageToDOM(sender, text, msgId) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            
+            messageDiv.className = `message ${sender === 'Vous' ? 'user-message' : 'bot-message'}`;
+            messageDiv.dataset.messageId = msgId;
+            
+            let messageContent = `<strong>${sender}:</strong> ${text}`;
+            
+            // Bouton Répondre supprimé
+            
+            messageDiv.innerHTML = messageContent;
+            chatContainer.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // Fonction pour envoyer un message
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const parentId = document.getElementById('parent_id').value;
+            const message = messageInput.value.trim();
+            
+            if (message === '') return;
+            
+            try {
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        parent_id: parentId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Ajouter les messages à l'affichage
+                addMessageToDOM(data.userMessage.sender, data.userMessage.text, data.userMessage.id);
+                addMessageToDOM(data.botMessage.sender, data.botMessage.text, data.botMessage.id);
+                
+                // Réinitialiser le formulaire
+                messageInput.value = '';
+                document.getElementById('parent_id').value = 0;
+                document.getElementById('replying-to').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Erreur lors de l\'envoi du message:', error);
+            }
+        }
+        
+        // Fonction pour répondre à un message spécifique
+        function replyToMessage(messageId) {
+            document.getElementById('parent_id').value = messageId;
+            const replyingTo = document.getElementById('replying-to');
+            replyingTo.style.display = 'block';
+            replyingTo.textContent = 'Réponse au message #' + messageId;
+            
+            // Ajouter le bouton Annuler
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Annuler';
+            cancelButton.style = 'float: right; font-size: 0.8em;';
+            cancelButton.onclick = cancelReply;
+            replyingTo.appendChild(cancelButton);
+            
+            document.getElementById('message-input').focus();
+        }
+        
+        // Fonction pour annuler la réponse
+        function cancelReply() {
+            document.getElementById('parent_id').value = 0;
+            document.getElementById('replying-to').style.display = 'none';
+        }
+        
+        // Event listener pour le bouton d'envoi
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        
+        // Event listener pour l'envoi avec Enter et gestion de Maj+Entrée pour les sauts de ligne
+        document.getElementById('message-input').addEventListener('keydown', function(e) {
+            // Si on appuie sur Entrée sans la touche Maj
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Empêcher le comportement par défaut (saut de ligne)
+                sendMessage();
+            }
+            // Si on appuie sur Entrée avec la touche Maj, laisser le comportement par défaut (saut de ligne)
+            
+            // Ajuster automatiquement la hauteur du textarea
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            
+            // Limiter à la hauteur maximale définie en CSS
+            if (this.scrollHeight > 150) {
+                this.style.overflowY = 'auto';
+            } else {
+                this.style.overflowY = 'hidden';
+            }
+        });
+        
+        // S'assurer que la taille du textarea s'ajuste aussi lorsqu'on y colle du texte
+        document.getElementById('message-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        
+        // Charger les messages au chargement de la page
+        document.addEventListener('DOMContentLoaded', loadMessages);
+    </script>
 </body>
 </html>

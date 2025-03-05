@@ -1,2 +1,4 @@
 /miette
 *.pyc
+node_modules
+data

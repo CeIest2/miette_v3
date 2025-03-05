@@ -1,0 +1,17 @@
+{
+    "name": "chat-bot-server",
+    "version": "1.0.0",
+    "description": "Serveur de chat avec un bot",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "express": "^4.21.2",
+        "express-session": "^1.18.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    }
+}
